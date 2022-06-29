@@ -34,31 +34,31 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
 
   const addProduct = async (productId: number) => {
     try {
-      const currentShoe = cart.find((product) => product.id === productId);
-      if (!currentShoe) {
-        api
-          .get<Product>(`/products/${productId}`)
-          .then((response) => {
-            const { id, title, image, price } = response.data;
+      const newCart = [...cart];
 
-            setCart([ ...cart, { id, title, image, price, amount: 1 } ]);
+      const stockAmount = await api.get(`stock/${productId}`).then(response => (response.data.amount));
+      const currentAmount = newCart.find(product => product.id === productId)?.amount || 0;
 
-            localStorage.setItem(
-              "@RocketShoes:cart",
-              JSON.stringify([ ...cart, { id, title, image, price, amount: 1 } ])
-            );
-          })
-          .catch(() => {
-            toast.error("Ocorreu um erro ao adicionar o produto!");
-          });
-      } else {
-        updateProductAmount({
-          productId,
-          amount: currentShoe.amount + 1,
-        });
+      if (stockAmount <= currentAmount) {
+        toast.error('Produto esgotado.');
+
+        return;
       }
+
+      const currentProduct = newCart.find(product => product.id === productId);
+
+      if (currentProduct) {
+        currentProduct.amount = currentAmount + 1;
+      } else {
+        const product = await api.get(`products/${productId}`).then(response => (response.data));
+
+        newCart.push({ ...product, amount: 1 });
+      }
+
+      setCart(newCart);
+
     } catch {
-      toast.error("Ocorreu um erro ao adicionar o produto!");
+      toast.error('Erro ao adicionar produto');
     }
   };
 
@@ -79,46 +79,32 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     amount,
   }: UpdateProductAmount) => {
     try {
-      const currentCar = cart;
-      const currentShoeIndex = currentCar.findIndex( (product) => product.id === productId );
-      const currentShoe = currentCar[currentShoeIndex];
+      if (amount <= 0) {
 
-      if (amount > currentShoe.amount) {
-        const stock = await api.get<Stock>(`/stock/${productId}`);
-
-        if (currentShoe.amount + 1 <= stock.data.amount) {
-          currentShoe.amount += 1;
-          setCart([...currentCar]);
-
-          localStorage.setItem(
-            "@RocketShoes:cart",
-            JSON.stringify([...currentCar])
-          );
-
-        } else {
-          toast.error("Produto esgotado!");
-        }
-      } else {
-        if (currentShoe.amount - 1 === 0) {
-          throw new Error();
-        } else {
-          currentShoe.amount -= 1;
-
-          setCart([...currentCar]);
-
-          localStorage.setItem(
-            "@RocketShoes:cart",
-            JSON.stringify([...currentCar])
-          );
-        }
+        throw new Error();
       }
 
-      if (currentShoeIndex === -1) {
+      const stockAmount = await api.get(`stock/${productId}`).then(response => (response.data.amount));
+
+      if (stockAmount < amount) {
+        toast.error('Produtos fora de estoque.');
+
+        return;
+      }
+
+      const newCart = [...cart];
+      const currentShoe = newCart.find(product => product.id === productId);
+
+      if (currentShoe) {
+        currentShoe.amount = amount;
+
+        setCart(newCart);
+      } else {
         throw new Error();
       }
 
     } catch {
-      toast.error("Erro ocorreu.");
+      toast.error('Erro ao atualizar carrinho.');
     }
   };
 
