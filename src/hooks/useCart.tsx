@@ -112,6 +112,11 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
           );
         }
       }
+
+      if (currentShoeIndex === -1) {
+        throw new Error();
+      }
+
     } catch {
       toast.error("Erro ocorreu.");
     }
